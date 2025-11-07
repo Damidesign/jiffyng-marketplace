@@ -1,6 +1,7 @@
 import { Search, ShoppingCart, User, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Link } from "react-router-dom";
 
 const Header = () => {
   return (
@@ -45,10 +46,12 @@ const Header = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" className="hidden lg:flex gap-2">
-              <User className="h-5 w-5" />
-              <span>Account</span>
-            </Button>
+            <Link to="/auth">
+              <Button variant="ghost" className="hidden lg:flex gap-2">
+                <User className="h-5 w-5" />
+                <span>Account</span>
+              </Button>
+            </Link>
             <Button variant="ghost" className="relative">
               <ShoppingCart className="h-5 w-5" />
               <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
