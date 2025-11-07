@@ -32,6 +32,8 @@ const Auth = () => {
 
         if (roleData?.role === "vendor") {
           navigate("/vendor/dashboard");
+        } else if (roleData?.role === "rider") {
+          navigate("/rider/dashboard");
         } else {
           navigate("/");
         }
@@ -104,6 +106,8 @@ const Auth = () => {
         
         if (roleData?.role === "vendor") {
           navigate("/vendor/dashboard");
+        } else if (roleData?.role === "rider") {
+          navigate("/rider/dashboard");
         } else {
           navigate("/");
         }

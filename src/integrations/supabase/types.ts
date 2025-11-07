@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      orders: {
+        Row: {
+          created_at: string
+          customer_id: string
+          customer_phone: string
+          delivery_address: string
+          id: string
+          product_id: string
+          product_name: string
+          product_price: number
+          quantity: number
+          rider_id: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          customer_phone: string
+          delivery_address: string
+          id?: string
+          product_id: string
+          product_name: string
+          product_price: number
+          quantity?: number
+          rider_id?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          customer_phone?: string
+          delivery_address?: string
+          id?: string
+          product_id?: string
+          product_name?: string
+          product_price?: number
+          quantity?: number
+          rider_id?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          total_amount?: number
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string | null
@@ -117,6 +168,12 @@ export type Database = {
     }
     Enums: {
       app_role: "vendor" | "customer" | "rider"
+      order_status:
+        | "pending"
+        | "accepted"
+        | "in_transit"
+        | "delivered"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -245,6 +302,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["vendor", "customer", "rider"],
+      order_status: [
+        "pending",
+        "accepted",
+        "in_transit",
+        "delivered",
+        "cancelled",
+      ],
     },
   },
 } as const
