@@ -128,6 +128,39 @@ export type Database = {
         }
         Relationships: []
       }
+      rider_profiles: {
+        Row: {
+          created_at: string
+          emergency_contact: string | null
+          id: string
+          license_number: string | null
+          updated_at: string
+          user_id: string
+          vehicle_plate_number: string
+          vehicle_type: string
+        }
+        Insert: {
+          created_at?: string
+          emergency_contact?: string | null
+          id?: string
+          license_number?: string | null
+          updated_at?: string
+          user_id: string
+          vehicle_plate_number: string
+          vehicle_type: string
+        }
+        Update: {
+          created_at?: string
+          emergency_contact?: string | null
+          id?: string
+          license_number?: string | null
+          updated_at?: string
+          user_id?: string
+          vehicle_plate_number?: string
+          vehicle_type?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -145,6 +178,39 @@ export type Database = {
           created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      vendor_profiles: {
+        Row: {
+          business_address: string
+          business_description: string | null
+          business_name: string
+          business_phone: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_address: string
+          business_description?: string | null
+          business_name: string
+          business_phone: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_address?: string
+          business_description?: string | null
+          business_name?: string
+          business_phone?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

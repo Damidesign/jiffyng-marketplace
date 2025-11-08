@@ -9,15 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { User, Package, Bike } from "lucide-react";
 import { z } from "zod";
+import { CustomerSignupForm } from "@/components/auth/CustomerSignupForm";
+import { VendorSignupForm, type VendorSignupData } from "@/components/auth/VendorSignupForm";
+import { RiderSignupForm, type RiderSignupData } from "@/components/auth/RiderSignupForm";
 
 type UserRole = "customer" | "vendor" | "rider";
-
-const signUpSchema = z.object({
-  email: z.string().trim().email({ message: "Invalid email address" }).max(255),
-  password: z.string().min(8, { message: "Password must be at least 8 characters" }).max(100),
-  fullName: z.string().trim().min(1, { message: "Name is required" }).max(100),
-  phone: z.string().trim().min(10, { message: "Invalid phone number" }).max(20),
-});
 
 const signInSchema = z.object({
   email: z.string().trim().email({ message: "Invalid email address" }),
@@ -28,8 +24,6 @@ const Auth = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
   const [selectedRole, setSelectedRole] = useState<UserRole>("customer");
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +35,7 @@ const Auth = () => {
           .from("user_roles")
           .select("role")
           .eq("user_id", session.user.id)
-          .single();
+          .maybeSingle();
 
         if (roleData?.role === "vendor") {
           navigate("/vendor/dashboard");
@@ -55,33 +49,17 @@ const Auth = () => {
     checkUser();
   }, [navigate]);
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCustomerSignup = async (data: { email: string; password: string; fullName: string; phone: string }) => {
     setLoading(true);
-
     try {
-      // Validate inputs
-      const validationResult = signUpSchema.safeParse({
-        email,
-        password,
-        fullName,
-        phone,
-      });
-
-      if (!validationResult.success) {
-        const firstError = validationResult.error.errors[0];
-        toast.error(firstError.message);
-        return;
-      }
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: validationResult.data.email,
-        password: validationResult.data.password,
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
         options: {
           data: {
-            full_name: validationResult.data.fullName,
-            phone: validationResult.data.phone,
-            role: selectedRole,
+            full_name: data.fullName,
+            phone: data.phone,
+            role: "customer",
           },
           emailRedirectTo: `${window.location.origin}/`,
         },
@@ -89,9 +67,93 @@ const Auth = () => {
 
       if (signUpError) throw signUpError;
 
-      if (data.user) {
-        toast.success("Account created successfully! Please check your role assignment.");
+      if (authData.user) {
+        toast.success("Account created successfully!");
         navigate("/");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to sign up");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVendorSignup = async (data: VendorSignupData) => {
+    setLoading(true);
+    try {
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.fullName,
+            phone: data.phone,
+            role: "vendor",
+          },
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (signUpError) throw signUpError;
+
+      if (authData.user) {
+        // Create vendor profile
+        const { error: profileError } = await supabase
+          .from("vendor_profiles")
+          .insert({
+            user_id: authData.user.id,
+            business_name: data.businessName,
+            business_address: data.businessAddress,
+            business_phone: data.businessPhone,
+            business_description: data.businessDescription || null,
+          });
+
+        if (profileError) throw profileError;
+
+        toast.success("Vendor account created successfully!");
+        navigate("/vendor/dashboard");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to sign up");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRiderSignup = async (data: RiderSignupData) => {
+    setLoading(true);
+    try {
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.fullName,
+            phone: data.phone,
+            role: "rider",
+          },
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (signUpError) throw signUpError;
+
+      if (authData.user) {
+        // Create rider profile
+        const { error: profileError } = await supabase
+          .from("rider_profiles")
+          .insert({
+            user_id: authData.user.id,
+            vehicle_type: data.vehicleType,
+            vehicle_plate_number: data.vehiclePlateNumber,
+            license_number: data.licenseNumber || null,
+            emergency_contact: data.emergencyContact || null,
+          });
+
+        if (profileError) throw profileError;
+
+        toast.success("Rider account created successfully!");
+        navigate("/rider/dashboard");
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to sign up");
@@ -199,53 +261,9 @@ const Auth = () => {
             </TabsContent>
 
             <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-phone">Phone Number</Label>
-                  <Input
-                    id="signup-phone"
-                    type="tel"
-                    placeholder="+234 800 000 0000"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>I am a</Label>
+                  <Label>I want to sign up as</Label>
                   <div className="grid grid-cols-3 gap-2">
                     {roleOptions.map((role) => (
                       <button
@@ -264,10 +282,19 @@ const Auth = () => {
                     ))}
                   </div>
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Sign Up"}
-                </Button>
-              </form>
+
+                <div className="pt-4">
+                  {selectedRole === "customer" && (
+                    <CustomerSignupForm onSubmit={handleCustomerSignup} loading={loading} />
+                  )}
+                  {selectedRole === "vendor" && (
+                    <VendorSignupForm onSubmit={handleVendorSignup} loading={loading} />
+                  )}
+                  {selectedRole === "rider" && (
+                    <RiderSignupForm onSubmit={handleRiderSignup} loading={loading} />
+                  )}
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
