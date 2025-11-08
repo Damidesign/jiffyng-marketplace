@@ -8,8 +8,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { User, Package, Bike } from "lucide-react";
+import { z } from "zod";
 
 type UserRole = "customer" | "vendor" | "rider";
+
+const signUpSchema = z.object({
+  email: z.string().trim().email({ message: "Invalid email address" }).max(255),
+  password: z.string().min(8, { message: "Password must be at least 8 characters" }).max(100),
+  fullName: z.string().trim().min(1, { message: "Name is required" }).max(100),
+  phone: z.string().trim().min(10, { message: "Invalid phone number" }).max(20),
+});
+
+const signInSchema = z.object({
+  email: z.string().trim().email({ message: "Invalid email address" }),
+  password: z.string().min(1, { message: "Password is required" }),
+});
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -47,13 +60,28 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      // Validate inputs
+      const validationResult = signUpSchema.safeParse({
         email,
         password,
+        fullName,
+        phone,
+      });
+
+      if (!validationResult.success) {
+        const firstError = validationResult.error.errors[0];
+        toast.error(firstError.message);
+        return;
+      }
+
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: validationResult.data.email,
+        password: validationResult.data.password,
         options: {
           data: {
-            full_name: fullName,
-            phone: phone,
+            full_name: validationResult.data.fullName,
+            phone: validationResult.data.phone,
+            role: selectedRole,
           },
           emailRedirectTo: `${window.location.origin}/`,
         },
@@ -62,19 +90,8 @@ const Auth = () => {
       if (signUpError) throw signUpError;
 
       if (data.user) {
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({ user_id: data.user.id, role: selectedRole });
-
-        if (roleError) throw roleError;
-
-        toast.success("Account created successfully!");
-        
-        if (selectedRole === "vendor") {
-          navigate("/vendor/dashboard");
-        } else {
-          navigate("/");
-        }
+        toast.success("Account created successfully! Please check your role assignment.");
+        navigate("/");
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to sign up");
@@ -88,9 +105,21 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Validate inputs
+      const validationResult = signInSchema.safeParse({
         email,
         password,
+      });
+
+      if (!validationResult.success) {
+        const firstError = validationResult.error.errors[0];
+        toast.error(firstError.message);
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: validationResult.data.email,
+        password: validationResult.data.password,
       });
 
       if (error) throw error;
@@ -100,7 +129,7 @@ const Auth = () => {
           .from("user_roles")
           .select("role")
           .eq("user_id", data.user.id)
-          .single();
+          .maybeSingle();
 
         toast.success("Signed in successfully!");
         

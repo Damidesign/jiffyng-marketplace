@@ -154,6 +154,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_pending_orders_for_rider: {
+        Args: never
+        Returns: {
+          created_at: string
+          customer_id: string
+          customer_phone: string
+          delivery_address: string
+          id: string
+          product_id: string
+          product_name: string
+          product_price: number
+          quantity: number
+          rider_id: string
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at: string
+          vendor_id: string
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

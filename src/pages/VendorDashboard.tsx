@@ -16,6 +16,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { z } from "zod";
+
+const productSchema = z.object({
+  name: z.string().trim().min(1, { message: "Product name is required" }).max(100),
+  description: z.string().trim().max(1000).optional(),
+  price: z.string().refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num > 0;
+  }, { message: "Price must be greater than 0" }),
+  stock: z.string().refine((val) => {
+    const num = parseInt(val);
+    return !isNaN(num) && num >= 0;
+  }, { message: "Stock must be 0 or greater" }),
+  category: z.string().trim().max(50).optional(),
+  image_url: z.string().trim().url({ message: "Invalid URL" }).optional().or(z.literal("")),
+});
 
 interface Product {
   id: string;
@@ -89,17 +105,26 @@ const VendorDashboard = () => {
     e.preventDefault();
     
     try {
+      // Validate inputs
+      const validationResult = productSchema.safeParse(formData);
+
+      if (!validationResult.success) {
+        const firstError = validationResult.error.errors[0];
+        toast.error(firstError.message);
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
       const { error } = await supabase.from("products").insert({
         vendor_id: session.user.id,
-        name: formData.name,
-        description: formData.description,
-        price: parseFloat(formData.price),
-        image_url: formData.image_url,
-        stock: parseInt(formData.stock),
-        category: formData.category,
+        name: validationResult.data.name,
+        description: validationResult.data.description || null,
+        price: parseFloat(validationResult.data.price),
+        image_url: validationResult.data.image_url || null,
+        stock: parseInt(validationResult.data.stock),
+        category: validationResult.data.category || null,
       });
 
       if (error) throw error;

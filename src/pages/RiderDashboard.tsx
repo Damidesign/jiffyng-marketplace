@@ -79,17 +79,13 @@ const RiderDashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Load available orders (pending and not assigned)
-      const { data: available, error: availableError } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("status", "pending")
-        .is("rider_id", null)
-        .order("created_at", { ascending: false });
+      // Get pending orders with masked data using the security function
+      const { data: pendingData, error: pendingError } = await supabase
+        .rpc("get_pending_orders_for_rider");
 
-      if (availableError) throw availableError;
+      if (pendingError) throw pendingError;
 
-      // Load my orders (assigned to me)
+      // Get rider's accepted orders with full details
       const { data: myOrdersData, error: myOrdersError } = await supabase
         .from("orders")
         .select("*")
@@ -99,7 +95,7 @@ const RiderDashboard = () => {
 
       if (myOrdersError) throw myOrdersError;
 
-      setAvailableOrders(available || []);
+      setAvailableOrders(pendingData || []);
       setMyOrders(myOrdersData || []);
     } catch (error: any) {
       toast.error("Failed to load orders");
