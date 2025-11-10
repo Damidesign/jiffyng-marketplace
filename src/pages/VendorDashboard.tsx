@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Package, LogOut, Edit, Trash2 } from "lucide-react";
+import { Plus, Package, LogOut, Edit, Trash2, Upload, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +30,6 @@ const productSchema = z.object({
     return !isNaN(num) && num >= 0;
   }, { message: "Stock must be 0 or greater" }),
   category: z.string().trim().max(50).optional(),
-  image_url: z.string().trim().url({ message: "Invalid URL" }).optional().or(z.literal("")),
 });
 
 interface Product {
@@ -49,11 +48,13 @@ const VendorDashboard = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     price: "",
-    image_url: "",
     stock: "",
     category: "",
   });
@@ -101,10 +102,54 @@ const VendorDashboard = () => {
     }
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size must be less than 5MB");
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not authenticated");
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
+      setUploading(true);
+      
       // Validate inputs
       const validationResult = productSchema.safeParse(formData);
 
@@ -117,12 +162,17 @@ const VendorDashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
+      let imageUrl = null;
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+
       const { error } = await supabase.from("products").insert({
         vendor_id: session.user.id,
         name: validationResult.data.name,
         description: validationResult.data.description || null,
         price: parseFloat(validationResult.data.price),
-        image_url: validationResult.data.image_url || null,
+        image_url: imageUrl,
         stock: parseInt(validationResult.data.stock),
         category: validationResult.data.category || null,
       });
@@ -135,13 +185,16 @@ const VendorDashboard = () => {
         name: "",
         description: "",
         price: "",
-        image_url: "",
         stock: "",
         category: "",
       });
+      setImageFile(null);
+      setImagePreview("");
       loadProducts();
     } catch (error: any) {
       toast.error(error.message || "Failed to add product");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -254,16 +307,44 @@ const VendorDashboard = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="image_url">Image URL</Label>
-                  <Input
-                    id="image_url"
-                    type="url"
-                    value={formData.image_url}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    placeholder="https://example.com/image.jpg"
-                  />
+                  <Label>Product Image</Label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-4">
+                    {imagePreview ? (
+                      <div className="relative">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                          onClick={removeImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center justify-center py-8">
+                        <Upload className="h-12 w-12 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground mb-1">Click to upload image</p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG, WEBP (max 5MB)</p>
+                        <Input
+                          id="image-upload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
-                <Button type="submit" className="w-full">Add Product</Button>
+                <Button type="submit" className="w-full" disabled={uploading}>
+                  {uploading ? "Adding Product..." : "Add Product"}
+                </Button>
               </form>
             </DialogContent>
           </Dialog>
