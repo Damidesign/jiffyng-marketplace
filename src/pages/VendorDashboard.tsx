@@ -51,6 +51,7 @@ const VendorDashboard = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -144,6 +145,32 @@ const VendorDashboard = () => {
     return data.publicUrl;
   };
 
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setFormData({
+      name: product.name,
+      description: product.description || "",
+      price: product.price.toString(),
+      stock: product.stock.toString(),
+      category: product.category || "",
+    });
+    setImagePreview(product.image_url || "");
+    setIsDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      description: "",
+      price: "",
+      stock: "",
+      category: "",
+    });
+    setImageFile(null);
+    setImagePreview("");
+    setEditingProduct(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -162,37 +189,48 @@ const VendorDashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      let imageUrl = null;
+      let imageUrl = editingProduct?.image_url || null;
       if (imageFile) {
         imageUrl = await uploadImage(imageFile);
       }
 
-      const { error } = await supabase.from("products").insert({
-        vendor_id: session.user.id,
-        name: validationResult.data.name,
-        description: validationResult.data.description || null,
-        price: parseFloat(validationResult.data.price),
-        image_url: imageUrl,
-        stock: parseInt(validationResult.data.stock),
-        category: validationResult.data.category || null,
-      });
+      if (editingProduct) {
+        // Update existing product
+        const { error } = await supabase
+          .from("products")
+          .update({
+            name: validationResult.data.name,
+            description: validationResult.data.description || null,
+            price: parseFloat(validationResult.data.price),
+            image_url: imageUrl,
+            stock: parseInt(validationResult.data.stock),
+            category: validationResult.data.category || null,
+          })
+          .eq("id", editingProduct.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success("Product updated successfully!");
+      } else {
+        // Create new product
+        const { error } = await supabase.from("products").insert({
+          vendor_id: session.user.id,
+          name: validationResult.data.name,
+          description: validationResult.data.description || null,
+          price: parseFloat(validationResult.data.price),
+          image_url: imageUrl,
+          stock: parseInt(validationResult.data.stock),
+          category: validationResult.data.category || null,
+        });
 
-      toast.success("Product added successfully!");
+        if (error) throw error;
+        toast.success("Product added successfully!");
+      }
+
       setIsDialogOpen(false);
-      setFormData({
-        name: "",
-        description: "",
-        price: "",
-        stock: "",
-        category: "",
-      });
-      setImageFile(null);
-      setImagePreview("");
+      resetForm();
       loadProducts();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add product");
+      toast.error(error.message || `Failed to ${editingProduct ? "update" : "add"} product`);
     } finally {
       setUploading(false);
     }
@@ -240,7 +278,10 @@ const VendorDashboard = () => {
             <h2 className="text-3xl font-bold">My Products</h2>
             <p className="text-muted-foreground">Manage your product inventory</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -249,9 +290,12 @@ const VendorDashboard = () => {
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Add New Product</DialogTitle>
+                <DialogTitle>{editingProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
                 <DialogDescription>
-                  Fill in the details to add a new product to your inventory
+                  {editingProduct 
+                    ? "Update the details of your product"
+                    : "Fill in the details to add a new product to your inventory"
+                  }
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -343,7 +387,10 @@ const VendorDashboard = () => {
                   </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={uploading}>
-                  {uploading ? "Adding Product..." : "Add Product"}
+                  {uploading 
+                    ? (editingProduct ? "Updating Product..." : "Adding Product...")
+                    : (editingProduct ? "Update Product" : "Add Product")
+                  }
                 </Button>
               </form>
             </DialogContent>
@@ -399,7 +446,12 @@ const VendorDashboard = () => {
                     )}
                   </div>
                   <div className="flex gap-2 mt-4">
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleEdit(product)}
+                    >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
